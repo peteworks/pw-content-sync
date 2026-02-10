@@ -1,0 +1,43 @@
+.sf-sync-result {
+	margin-top: 0.5em;
+	font-size: 13px;
+}
+.sf-sync-result.sf-sync-success {
+	color: #00a32a;
+}
+.sf-sync-result.sf-sync-error {
+	color: #d63638;
+}
+
+/* Application password instructions (Settings → Content Sync) */
+.sf-sync-app-password-details {
+	margin: 1em 0 1.5em;
+	border: 1px solid #c3c4c7;
+	background: #f6f7f7;
+	border-radius: 4px;
+	padding: 0 12px 12px;
+}
+.sf-sync-app-password-summary {
+	cursor: pointer;
+	font-weight: 600;
+	padding: 12px 0;
+	list-style: none;
+}
+.sf-sync-app-password-summary::-webkit-details-marker {
+	display: none;
+}
+.sf-sync-app-password-summary::before {
+	content: "▶ ";
+	display: inline-block;
+	width: 1em;
+}
+.sf-sync-app-password-details[open] .sf-sync-app-password-summary::before {
+	content: "▼ ";
+}
+.sf-sync-app-password-steps {
+	margin: 0.5em 0 1em 1.5em;
+	padding: 0;
+}
+.sf-sync-app-password-steps li {
+	margin-bottom: 0.5em;
+}

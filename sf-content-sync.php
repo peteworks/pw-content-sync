@@ -1,0 +1,63 @@
+<?php
+/**
+ * Plugin Name: Content Sync
+ * Description: Sync page content and ACF fields from a source WordPress site to the current site. Pull content page-by-page via REST API.
+ * Version: 1.0.0
+ * Author: Pete
+ * License: GPL v2 or later
+ * Text Domain: sf-content-sync
+ * Requires at least: 5.6
+ * Requires PHP: 7.4
+ */
+
+declare(strict_types=1);
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+define( 'SF_CONTENT_SYNC_VERSION', '1.0.0' );
+define( 'SF_CONTENT_SYNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'SF_CONTENT_SYNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'SF_CONTENT_SYNC_REST_NAMESPACE', 'sf-sync/v1' );
+
+require_once SF_CONTENT_SYNC_PLUGIN_DIR . 'includes/class-sf-sync-rest-source.php';
+require_once SF_CONTENT_SYNC_PLUGIN_DIR . 'includes/class-sf-sync-settings.php';
+require_once SF_CONTENT_SYNC_PLUGIN_DIR . 'includes/class-sf-sync-media.php';
+require_once SF_CONTENT_SYNC_PLUGIN_DIR . 'includes/class-sf-sync-mapper.php';
+require_once SF_CONTENT_SYNC_PLUGIN_DIR . 'includes/class-sf-sync-field-walker.php';
+require_once SF_CONTENT_SYNC_PLUGIN_DIR . 'includes/class-sf-sync-pull.php';
+
+/**
+ * Check for ACF and bootstrap the plugin.
+ */
+function sf_content_sync_init(): void {
+	if ( ! function_exists( 'get_fields' ) || ! function_exists( 'acf_get_field_groups' ) ) {
+		add_action( 'admin_notices', static function (): void {
+			echo '<div class="notice notice-warning"><p>';
+			esc_html_e( 'SF Content Sync requires Advanced Custom Fields (ACF) to be active.', 'sf-content-sync' );
+			echo '</p></div>';
+		} );
+		return;
+	}
+
+	SF_Sync_Rest_Source::register();
+	SF_Sync_Settings::init();
+	SF_Sync_Pull::init();
+}
+
+add_action( 'plugins_loaded', 'sf_content_sync_init' );
+
+/**
+ * Add "View details" link on the Plugins list (next to "By Pete") linking to settings and instructions.
+ */
+add_filter( 'plugin_row_meta', function ( array $plugin_meta, string $plugin_file, array $plugin_data, string $status ): array {
+	if ( $plugin_file !== 'pw-content-sync/sf-content-sync.php' ) {
+		return $plugin_meta;
+	}
+	$settings_url = admin_url( 'options-general.php?page=sf-content-sync' );
+	if ( current_user_can( 'manage_options' ) ) {
+		array_unshift( $plugin_meta, '<a href="' . esc_url( $settings_url ) . '">' . esc_html__( 'View details', 'sf-content-sync' ) . '</a>' );
+	}
+	return $plugin_meta;
+}, 10, 4 );
