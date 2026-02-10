@@ -1,0 +1,12 @@
+{
+    "name": "pete/pw-content-sync",
+    "description": "Sync page content and ACF fields from a source WordPress site via REST API.",
+    "type": "wordpress-plugin",
+    "require": {
+        "php": ">=7.4",
+        "yahnis-elsts/plugin-update-checker": "^5.0"
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

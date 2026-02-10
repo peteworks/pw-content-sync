@@ -21,6 +21,29 @@ define( 'SF_CONTENT_SYNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SF_CONTENT_SYNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'SF_CONTENT_SYNC_REST_NAMESPACE', 'sf-sync/v1' );
 
+/**
+ * GitHub-based updates. Define in wp-config.php:
+ *   PW_CONTENT_SYNC_GITHUB_REPO - e.g. 'your-username/pw-content-sync' (required)
+ *   PW_CONTENT_SYNC_GITHUB_TOKEN - GitHub Personal Access Token (required for private repos)
+ * Updates are delivered from GitHub Releases (zip built by CI on push to production).
+ */
+if ( is_admin() && ! defined( 'WP_CLI' ) && defined( 'PW_CONTENT_SYNC_GITHUB_REPO' ) && PW_CONTENT_SYNC_GITHUB_REPO !== '' ) {
+	$puc_autoload = SF_CONTENT_SYNC_PLUGIN_DIR . 'vendor/autoload.php';
+	if ( file_exists( $puc_autoload ) ) {
+		require_once $puc_autoload;
+		$pw_content_sync_repo_url = 'https://github.com/' . trim( PW_CONTENT_SYNC_GITHUB_REPO, '/' );
+		$pw_content_sync_update_checker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+			$pw_content_sync_repo_url,
+			__FILE__,
+			'pw-content-sync'
+		);
+		$pw_content_sync_update_checker->getVcsApi()->enableReleaseAssets();
+		if ( defined( 'PW_CONTENT_SYNC_GITHUB_TOKEN' ) && PW_CONTENT_SYNC_GITHUB_TOKEN !== '' ) {
+			$pw_content_sync_update_checker->setAuthentication( PW_CONTENT_SYNC_GITHUB_TOKEN );
+		}
+	}
+}
+
 require_once SF_CONTENT_SYNC_PLUGIN_DIR . 'includes/class-sf-sync-rest-source.php';
 require_once SF_CONTENT_SYNC_PLUGIN_DIR . 'includes/class-sf-sync-settings.php';
 require_once SF_CONTENT_SYNC_PLUGIN_DIR . 'includes/class-sf-sync-media.php';

@@ -1,0 +1,51 @@
+# When you push to the production branch, create a GitHub Release with a zip
+# that WordPress can install. Other sites with the plugin get updates from this.
+name: Release on production
+
+on:
+  push:
+    branches:
+      - production
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+
+      - name: Install Composer dependencies
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: Get plugin version
+        id: version
+        run: |
+          VERSION=$(grep "Version:" sf-content-sync.php | head -1 | sed 's/.*Version: *\([0-9.]*\).*/\1/' | tr -d ' ')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Plugin version: $VERSION"
+
+      - name: Build plugin zip
+        run: |
+          mkdir -p pw-content-sync
+          rsync -a --exclude='.git' --exclude='.github' --exclude='.gitignore' \
+            --exclude='*.zip' --exclude='pw-content-sync' . pw-content-sync/
+          zip -r pw-content-sync.zip pw-content-sync
+
+      - name: Create or update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          files: pw-content-sync.zip
+          generate_release_notes: true
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
