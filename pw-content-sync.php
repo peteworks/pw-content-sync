@@ -75,7 +75,7 @@ add_action( 'plugins_loaded', 'sf_content_sync_init' );
  * Add "View details" link on the Plugins list (next to "By Pete") linking to settings and instructions.
  */
 add_filter( 'plugin_row_meta', function ( array $plugin_meta, string $plugin_file, array $plugin_data, string $status ): array {
-	if ( $plugin_file !== 'pw-content-sync/sf-content-sync.php' ) {
+	if ( $plugin_file !== 'pw-content-sync/pw-content-sync.php' ) {
 		return $plugin_meta;
 	}
 	$settings_url = admin_url( 'options-general.php?page=sf-content-sync' );

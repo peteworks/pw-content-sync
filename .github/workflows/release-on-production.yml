@@ -28,7 +28,7 @@ jobs:
       - name: Get plugin version
         id: version
         run: |
-          VERSION=$(grep "Version:" sf-content-sync.php | head -1 | sed 's/.*Version: *\([0-9.]*\).*/\1/' | tr -d ' ')
+          VERSION=$(grep "Version:" pw-content-sync.php | head -1 | sed 's/.*Version: *\([0-9.]*\).*/\1/' | tr -d ' ')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Plugin version: $VERSION"
 
