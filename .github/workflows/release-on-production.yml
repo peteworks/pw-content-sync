@@ -1,11 +1,11 @@
 # When you push to the production branch, create a GitHub Release with a zip
 # that WordPress can install. Other sites with the plugin get updates from this.
-name: Release on production
+name: Release on Production
 
 on:
   push:
     branches:
-      - production
+      - Production
 
 permissions:
   contents: write
