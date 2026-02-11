@@ -84,3 +84,27 @@ add_filter( 'plugin_row_meta', function ( array $plugin_meta, string $plugin_fil
 	}
 	return $plugin_meta;
 }, 10, 4 );
+
+/**
+ * Add "Check for updates" link to the plugin action row on wp-admin/plugins.php.
+ * Uses the same URL that Plugin Update Checker expects when GitHub updates are enabled.
+ */
+add_filter( 'plugin_action_links_pw-content-sync/pw-content-sync.php', function ( array $actions ): array {
+	if ( ! current_user_can( 'update_plugins' ) ) {
+		return $actions;
+	}
+	if ( defined( 'PW_CONTENT_SYNC_GITHUB_REPO' ) && PW_CONTENT_SYNC_GITHUB_REPO !== '' ) {
+		$check_url = wp_nonce_url(
+			add_query_arg(
+				[
+					'puc_check_for_updates' => 1,
+					'puc_slug'              => 'pw-content-sync',
+				],
+				admin_url( 'plugins.php' )
+			),
+			'puc_check_for_updates'
+		);
+		$actions['pw_content_sync_check'] = '<a href="' . esc_url( $check_url ) . '">' . esc_html__( 'Check for updates', 'sf-content-sync' ) . '</a>';
+	}
+	return $actions;
+} );
