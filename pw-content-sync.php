@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Content Sync
  * Description: Sync page content and ACF fields from a source WordPress site to the current site. Pull content page-by-page via REST API.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Pete
  * License: GPL v2 or later
  * Text Domain: sf-content-sync
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'SF_CONTENT_SYNC_VERSION', '1.0.0' );
+define( 'SF_CONTENT_SYNC_VERSION', '1.0.2' );
 define( 'SF_CONTENT_SYNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SF_CONTENT_SYNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'SF_CONTENT_SYNC_REST_NAMESPACE', 'sf-sync/v1' );

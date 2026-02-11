@@ -41,11 +41,19 @@
 			.then(function (json) {
 				$result.classList.remove('sf-sync-error', 'sf-sync-success');
 				if (json.success) {
-					$result.textContent = (json.data && json.data.message) || (i18n.success || 'Content pulled successfully.');
+					var msg = (json.data && json.data.message) || (i18n.success || 'Content pulled successfully.');
+					var received = (json.data && json.data.acf_received) || [];
+					var skipped = (json.data && json.data.acf_skipped) || [];
+					if (received.length === 0) {
+						msg += ' Source sent no ACF data for this post (check ACF location on source).';
+					} else if (skipped.length > 0) {
+						msg += ' ACF fields not found on this post (check location rules): ' + skipped.join(', ');
+					}
+					$result.textContent = msg;
 					$result.classList.add('sf-sync-success');
 					setTimeout(function () {
 						window.location.reload();
-					}, 800);
+					}, skipped.length > 0 ? 4000 : 800);
 				} else {
 					var msg = (json.data && json.data.message) || 'Unknown error';
 					if (json.data && json.data.tried_url) {

@@ -19,6 +19,12 @@ final class SF_Sync_Field_Walker {
 	/** @var int Destination post ID. */
 	private int $post_id;
 
+	/** @var list<string> Field names that were updated (for diagnostics). */
+	private array $updated = [];
+
+	/** @var list<string> Field names skipped because no matching field on destination (for diagnostics). */
+	private array $skipped = [];
+
 	public function __construct( int $post_id, array $url_to_attachment_id = [] ) {
 		$this->post_id = $post_id;
 		$this->url_to_attachment_id = $url_to_attachment_id;
@@ -35,10 +41,12 @@ final class SF_Sync_Field_Walker {
 	public function update_field_from_payload( string $field_name, mixed $value ): bool {
 		$field = get_field_object( $field_name, $this->post_id );
 		if ( ! is_array( $field ) ) {
+			$this->skipped[] = $field_name;
 			return false;
 		}
 		$processed = $this->process_value( $value, $field );
 		update_field( $field_name, $processed, $this->post_id );
+		$this->updated[] = $field_name;
 		return true;
 	}
 
@@ -183,5 +191,15 @@ final class SF_Sync_Field_Walker {
 	 */
 	public function get_url_to_attachment_id_cache(): array {
 		return $this->url_to_attachment_id;
+	}
+
+	/** @return list<string> */
+	public function get_updated_fields(): array {
+		return $this->updated;
+	}
+
+	/** @return list<string> */
+	public function get_skipped_fields(): array {
+		return $this->skipped;
 	}
 }

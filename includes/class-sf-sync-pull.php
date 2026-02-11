@@ -211,12 +211,22 @@ final class SF_Sync_Pull {
 		}
 
 		$acf = $data['acf'] ?? [];
+		$acf_received = is_array( $acf ) ? array_keys( $acf ) : [];
+		$acf_updated  = [];
+		$acf_skipped  = [];
 		if ( is_array( $acf ) && ! empty( $acf ) ) {
 			$walker = new SF_Sync_Field_Walker( $dest_post_id, $url_to_id );
 			$walker->update_all_acf_from_payload( $acf );
+			$acf_updated = $walker->get_updated_fields();
+			$acf_skipped = $walker->get_skipped_fields();
 		}
 
 		$message = __( 'Content and ACF fields updated.', 'sf-content-sync' );
-		wp_send_json_success( [ 'message' => $message ] );
+		wp_send_json_success( [
+			'message'       => $message,
+			'acf_received'  => $acf_received,
+			'acf_updated'   => $acf_updated,
+			'acf_skipped'   => $acf_skipped,
+		] );
 	}
 }
