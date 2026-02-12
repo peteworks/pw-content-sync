@@ -283,9 +283,20 @@ final class SF_Sync_Rest_Source {
 	 */
 	private static function replace_attachments_in_value( mixed $value ): mixed {
 		if ( is_array( $value ) ) {
-			// ACF image field: array with 'ID', 'url', etc. or just ID key.
+			// ACF image/file: array with 'ID'. Relationship/post_object also use 'ID' — only convert to attachment payload when post type is attachment.
 			if ( isset( $value['ID'] ) && is_numeric( $value['ID'] ) ) {
-				return self::attachment_to_payload( (int) $value['ID'] );
+				$post = get_post( (int) $value['ID'] );
+				if ( $post instanceof WP_Post ) {
+					if ( $post->post_type === 'attachment' ) {
+						return self::attachment_to_payload( (int) $value['ID'] );
+					}
+					return [
+						'type'  => 'post',
+						'id'    => $post->ID,
+						'slug'  => $post->post_name,
+						'title' => $post->post_title,
+					];
+				}
 			}
 			// Repeater / flexible: list of rows.
 			$out = [];

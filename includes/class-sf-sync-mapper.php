@@ -59,7 +59,7 @@ final class SF_Sync_Mapper {
 	 * @return int Destination post ID or 0.
 	 */
 	/**
-	 * Resolve source value (ID or array with type, id, slug, title) to destination post ID.
+	 * Resolve source value (ID or array with id/slug/title or ID/post_name/post_title) to destination post ID.
 	 */
 	public static function resolve_post_object( $value, string $post_type = 'page' ): int {
 		$slug  = '';
@@ -68,9 +68,9 @@ final class SF_Sync_Mapper {
 		if ( is_numeric( $value ) && (int) $value > 0 ) {
 			$id = (int) $value;
 		} elseif ( is_array( $value ) ) {
-			$id    = isset( $value['id'] ) ? (int) $value['id'] : 0;
-			$slug  = isset( $value['slug'] ) && is_string( $value['slug'] ) ? $value['slug'] : '';
-			$title = isset( $value['title'] ) && is_string( $value['title'] ) ? $value['title'] : '';
+			$id    = isset( $value['id'] ) ? (int) $value['id'] : ( isset( $value['ID'] ) ? (int) $value['ID'] : 0 );
+			$slug  = isset( $value['slug'] ) && is_string( $value['slug'] ) ? $value['slug'] : ( isset( $value['post_name'] ) && is_string( $value['post_name'] ) ? $value['post_name'] : '' );
+			$title = isset( $value['title'] ) && is_string( $value['title'] ) ? $value['title'] : ( isset( $value['post_title'] ) && is_string( $value['post_title'] ) ? $value['post_title'] : '' );
 		}
 		return self::source_to_destination_post_id( $id, $post_type, $slug, $title );
 	}

@@ -41,13 +41,89 @@ final class SF_Sync_Field_Walker {
 	public function update_field_from_payload( string $field_name, mixed $value ): bool {
 		$field = get_field_object( $field_name, $this->post_id );
 		if ( ! is_array( $field ) ) {
+			// Conditionally visible or never-saved fields: get_field_object() can return false when
+			// looking up by name. Resolve field config from post's field groups by name.
+			$field = $this->get_field_config_by_name( $field_name );
+		}
+		if ( ! is_array( $field ) ) {
 			$this->skipped[] = $field_name;
 			return false;
 		}
 		$processed = $this->process_value( $value, $field );
-		update_field( $field_name, $processed, $this->post_id );
+		// Use field key so ACF accepts the update even when field is conditionally hidden.
+		$selector = $field['key'] ?? $field_name;
+		update_field( $selector, $processed, $this->post_id );
 		$this->updated[] = $field_name;
 		return true;
+	}
+
+	/**
+	 * Get ACF field config by name from field groups that apply to this post.
+	 * Use when get_field_object( $name, $post_id ) returns false (e.g. conditional field not yet saved).
+	 *
+	 * @return array|null Field config or null if not found.
+	 */
+	private function get_field_config_by_name( string $field_name ): ?array {
+		if ( ! function_exists( 'acf_get_field_groups' ) || ! function_exists( 'acf_get_fields' ) ) {
+			return null;
+		}
+		$groups = acf_get_field_groups( [ 'post_id' => $this->post_id ] );
+		if ( ! is_array( $groups ) ) {
+			return null;
+		}
+		foreach ( $groups as $group ) {
+			$key = $group['key'] ?? '';
+			if ( $key === '' ) {
+				continue;
+			}
+			$fields = acf_get_fields( $key );
+			if ( ! is_array( $fields ) ) {
+				continue;
+			}
+			$found = $this->find_field_by_name( $fields, $field_name );
+			if ( $found !== null ) {
+				return $found;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Find field config by name in a flat or nested list (e.g. group sub_fields).
+	 *
+	 * @param array $fields   Array of field configs.
+	 * @param string $name   Field name.
+	 * @return array|null    Field config or null.
+	 */
+	private function find_field_by_name( array $fields, string $name ): ?array {
+		foreach ( $fields as $field ) {
+			if ( ! is_array( $field ) ) {
+				continue;
+			}
+			if ( ( $field['name'] ?? '' ) === $name ) {
+				return $field;
+			}
+			$sub = $field['sub_fields'] ?? [];
+			if ( is_array( $sub ) && ! empty( $sub ) ) {
+				$found = $this->find_field_by_name( $sub, $name );
+				if ( $found !== null ) {
+					return $found;
+				}
+			}
+			$layouts = $field['layouts'] ?? [];
+			if ( is_array( $layouts ) && ! empty( $layouts ) ) {
+				foreach ( $layouts as $layout ) {
+					$layout_sub = $layout['sub_fields'] ?? [];
+					if ( is_array( $layout_sub ) && ! empty( $layout_sub ) ) {
+						$found = $this->find_field_by_name( $layout_sub, $name );
+						if ( $found !== null ) {
+							return $found;
+						}
+					}
+				}
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -63,10 +139,16 @@ final class SF_Sync_Field_Walker {
 			case 'post_object':
 			case 'relationship':
 				return $this->process_post_object_value( $value, $field );
+			case 'page_link':
+				return $this->process_page_link_value( $value, $field );
 			case 'repeater':
 				return $this->process_repeater_value( $value, $field );
 			case 'flexible_content':
 				return $this->process_flexible_value( $value, $field );
+			case 'group':
+				return $this->process_group_value( $value, $field );
+			case 'component_field':
+				return $this->process_component_value( $value, $field );
 			case 'gallery':
 				return $this->process_gallery_value( $value );
 			default:
@@ -86,7 +168,8 @@ final class SF_Sync_Field_Walker {
 		if ( ! empty( $field['post_type'] ) ) {
 			$post_type = is_array( $field['post_type'] ) ? ( $field['post_type'][0] ?? 'page' ) : $field['post_type'];
 		}
-		$multiple = ! empty( $field['multiple'] );
+		// Relationship is always multi-value; post_object can be multiple.
+		$multiple = ! empty( $field['multiple'] ) || ( $field['type'] ?? '' ) === 'relationship';
 		if ( $multiple && is_array( $value ) ) {
 			$ids = [];
 			foreach ( $value as $item ) {
@@ -98,6 +181,23 @@ final class SF_Sync_Field_Walker {
 			return $ids;
 		}
 		return SF_Sync_Mapper::resolve_post_object( $value, $post_type );
+	}
+
+	/**
+	 * Resolve page_link when value is a post payload (from source). URL strings pass through.
+	 */
+	private function process_page_link_value( mixed $value, array $field ): mixed {
+		if ( ! is_array( $value ) || ( $value['type'] ?? '' ) !== 'post' ) {
+			return $value;
+		}
+		$post_type = 'page';
+		if ( ! empty( $field['post_type'] ) && is_array( $field['post_type'] ) ) {
+			$post_type = $field['post_type'][0] ?? 'page';
+		} elseif ( ! empty( $field['post_type'] ) && is_string( $field['post_type'] ) ) {
+			$post_type = $field['post_type'];
+		}
+		$resolved = SF_Sync_Mapper::resolve_post_object( $value, $post_type );
+		return $resolved > 0 ? $resolved : $value;
 	}
 
 	private function process_repeater_value( mixed $value, array $field ): array {
@@ -119,6 +219,52 @@ final class SF_Sync_Field_Walker {
 				$out_row[ $name ] = $this->process_value( $row[ $name ], $sub );
 			}
 			$out[] = $out_row;
+		}
+		return $out;
+	}
+
+	/**
+	 * Process a group field: value is associative array keyed by sub_field name.
+	 * Recursively process each sub_field so nested flexible_content, image, etc. are resolved.
+	 */
+	private function process_group_value( mixed $value, array $field ): array {
+		if ( ! is_array( $value ) ) {
+			return [];
+		}
+		$sub_fields = $field['sub_fields'] ?? [];
+		$out       = [];
+		foreach ( $sub_fields as $sub ) {
+			$name = $sub['name'] ?? '';
+			if ( $name === '' || ! array_key_exists( $name, $value ) ) {
+				continue;
+			}
+			$out[ $name ] = $this->process_value( $value[ $name ], $sub );
+		}
+		return $out;
+	}
+
+	/**
+	 * Process ACF component field (embedded field group). Resolves nested attachments/post_object.
+	 */
+	private function process_component_value( mixed $value, array $field ): mixed {
+		if ( ! is_array( $value ) ) {
+			return [];
+		}
+		$group_key = $field['field_group_key'] ?? '';
+		if ( $group_key === '' || ! function_exists( 'acf_get_fields' ) ) {
+			return $value;
+		}
+		$sub_fields = acf_get_fields( $group_key );
+		if ( ! is_array( $sub_fields ) ) {
+			return $value;
+		}
+		$out = [];
+		foreach ( $sub_fields as $sub ) {
+			$name = $sub['name'] ?? '';
+			if ( $name === '' || ! array_key_exists( $name, $value ) ) {
+				continue;
+			}
+			$out[ $name ] = $this->process_value( $value[ $name ], $sub );
 		}
 		return $out;
 	}
@@ -175,12 +321,39 @@ final class SF_Sync_Field_Walker {
 
 	/**
 	 * Update all ACF fields on the post from the source 'acf' payload.
+	 * Runs retry passes for skipped fields so conditionally visible fields
+	 * (e.g. dependent on a true_false, or chained A→B→C) get applied after their controlling field is set.
 	 *
 	 * @param array<string, mixed> $acf_payload Top-level ACF key => value from source.
 	 */
 	public function update_all_acf_from_payload( array $acf_payload ): void {
 		foreach ( $acf_payload as $field_name => $value ) {
 			$this->update_field_from_payload( $field_name, $value );
+		}
+		$max_passes = 5;
+		for ( $pass = 0; $pass < $max_passes; $pass++ ) {
+			$to_retry = $this->skipped;
+			if ( empty( $to_retry ) ) {
+				break;
+			}
+			$resolved_any = false;
+			foreach ( $to_retry as $field_name ) {
+				if ( ! array_key_exists( $field_name, $acf_payload ) ) {
+					continue;
+				}
+				$prev_skipped = $this->skipped;
+				$this->skipped = [];
+				$ok = $this->update_field_from_payload( $field_name, $acf_payload[ $field_name ] );
+				if ( $ok ) {
+					$this->skipped = array_values( array_filter( $prev_skipped, fn( string $n ): bool => $n !== $field_name ) );
+					$resolved_any = true;
+				} else {
+					$this->skipped = $prev_skipped;
+				}
+			}
+			if ( ! $resolved_any ) {
+				break;
+			}
 		}
 	}
 

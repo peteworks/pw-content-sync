@@ -13,8 +13,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class SF_Sync_Media {
 
+	/** Meta key used to store the source URL so we can reuse the attachment on future pulls. */
+	public const SOURCE_URL_META_KEY = '_content_sync_source_url';
+
 	/**
 	 * Download file from URL and create attachment. Returns new attachment ID or 0 on failure.
+	 * If an attachment with this source URL already exists in the media library, that ID is returned instead.
 	 *
 	 * @param string   $url       Full URL to the file.
 	 * @param int      $post_id   Optional post to attach to.
@@ -28,6 +32,13 @@ final class SF_Sync_Media {
 		}
 		if ( isset( $url_to_id[ $url ] ) ) {
 			return $url_to_id[ $url ];
+		}
+
+		// Reuse existing attachment if we previously imported from this URL.
+		$existing = self::get_attachment_id_by_source_url( $url );
+		if ( $existing > 0 ) {
+			$url_to_id[ $url ] = $existing;
+			return $existing;
 		}
 
 		$tmp = download_url( $url, 30 );
@@ -52,8 +63,27 @@ final class SF_Sync_Media {
 		if ( $alt && wp_attachment_is_image( $id ) ) {
 			update_post_meta( $id, '_wp_attachment_image_alt', $alt );
 		}
+		update_post_meta( $id, self::SOURCE_URL_META_KEY, $url );
 		$url_to_id[ $url ] = $id;
 		return $id;
+	}
+
+	/**
+	 * Find an attachment that was previously imported from the given source URL.
+	 *
+	 * @param string $url Full source URL stored in SOURCE_URL_META_KEY.
+	 * @return int Attachment ID or 0.
+	 */
+	public static function get_attachment_id_by_source_url( string $url ): int {
+		$posts = get_posts( [
+			'post_type'      => 'attachment',
+			'post_status'    => 'any',
+			'meta_key'       => self::SOURCE_URL_META_KEY,
+			'meta_value'     => $url,
+			'posts_per_page' => 1,
+			'fields'         => 'ids',
+		] );
+		return ! empty( $posts ) ? (int) $posts[0] : 0;
 	}
 
 	/**
