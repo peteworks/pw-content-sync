@@ -183,6 +183,20 @@ final class SF_Sync_Pull {
 			wp_send_json_error( [ 'message' => __( 'Invalid response from source.', 'sf-content-sync' ) ] );
 		}
 
+		$post_author = get_current_user_id();
+		if ( isset( $data['author'] ) && is_array( $data['author'] ) ) {
+			$author_user = null;
+			if ( ! empty( $data['author']['login'] ) ) {
+				$author_user = get_user_by( 'login', sanitize_user( $data['author']['login'], true ) );
+			}
+			if ( ! $author_user instanceof WP_User && ! empty( $data['author']['email'] ) ) {
+				$author_user = get_user_by( 'email', sanitize_email( $data['author']['email'] ) );
+			}
+			if ( $author_user instanceof WP_User && $author_user->ID > 0 ) {
+				$post_author = $author_user->ID;
+			}
+		}
+
 		$post_data = [
 			'ID'           => $dest_post_id,
 			'post_title'   => isset( $data['title'] ) ? sanitize_text_field( $data['title'] ) : '',
@@ -191,6 +205,9 @@ final class SF_Sync_Pull {
 			'post_name'    => isset( $data['slug'] ) ? sanitize_title( $data['slug'] ) : '',
 			'post_status'  => isset( $data['status'] ) ? sanitize_key( $data['status'] ) : 'draft',
 		];
+		if ( $post_author > 0 ) {
+			$post_data['post_author'] = $post_author;
+		}
 		wp_update_post( $post_data );
 
 		// Set page template first so ACF field groups tied to the template are available.

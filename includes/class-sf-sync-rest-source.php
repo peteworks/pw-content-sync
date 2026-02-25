@@ -252,6 +252,17 @@ final class SF_Sync_Rest_Source {
 			'acf'            => $acf,
 		];
 
+		$author_id = (int) $post->post_author;
+		if ( $author_id > 0 ) {
+			$author = get_userdata( $author_id );
+			if ( $author instanceof WP_User ) {
+				$data['author'] = [
+					'login' => $author->user_login,
+					'email' => $author->user_email,
+				];
+			}
+		}
+
 		if ( $post_type === 'page' ) {
 			$page_template = get_post_meta( $post_id, '_wp_page_template', true );
 			$data['page_template'] = is_string( $page_template ) && $page_template !== '' ? $page_template : 'default';
